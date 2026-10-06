@@ -1,3 +1,4 @@
+from datetime import timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -5,7 +6,9 @@ import pandas as pd
 import pytest
 
 from fraud_detection.bundle import load_bundle
-from fraud_detection.service import Scorer, create_app
+from fraud_detection.features import build_features
+from fraud_detection.service import Scorer, ScoreRequest, create_app
+from fraud_detection.training import lightgbm_scores
 from tests.conftest import AppClient
 
 VALID: dict[str, Any] = {
@@ -100,6 +103,33 @@ def test_velocity_builds_up_across_requests(scorer: Scorer) -> None:
     ]
     scores = [client.post("/score", json=t).json()["score"] for t in burst]
     assert scores[-1] > scores[0]
+
+
+def test_the_service_scores_a_transaction_exactly_as_training_does(
+    tiny_bundle: Path, tiny_transactions: pd.DataFrame
+) -> None:
+    """No training/serving skew: the request path gives the score the offline feature matrix gives."""
+    bundle = load_bundle(tiny_bundle)
+    cutoff = len(tiny_transactions) - 300
+    scorer = Scorer(bundle, tiny_transactions.iloc[:cutoff])
+    offline = lightgbm_scores(bundle.booster, build_features(tiny_transactions).iloc[cutoff:])
+
+    # The same wall-clock time sent with a +01:00 offset, as a cardholder in the Netherlands would send it.
+    local = timezone(timedelta(hours=1))
+    online = []
+    for row in tiny_transactions.iloc[cutoff:].to_dict("records"):
+        request = ScoreRequest(
+            transaction_id=str(row["transaction_id"]),
+            timestamp=pd.Timestamp(row["ts"]).tz_localize(None).to_pydatetime().replace(tzinfo=local),
+            customer_id=row["customer_id"],
+            customer_country=row["customer_country"],
+            merchant_id=row["merchant_id"],
+            merchant_country=row["merchant_country"],
+            amount=row["amount"],
+            device_id=row["device_id"],
+        )
+        online.append(scorer.score(request).score)
+    assert online == pytest.approx(offline.tolist(), abs=1e-12)
 
 
 def test_health_reports_the_model_version(client: AppClient) -> None:

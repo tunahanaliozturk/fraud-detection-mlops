@@ -22,6 +22,12 @@ Features are computed by `CustomerHistory.features(txn)` from the history as it 
   rewriting every row after a cut-off leaves earlier features unchanged, shuffling the input changes nothing, and a
   hand-built history gives the expected counts (`tests/test_features.py`). Swapping the two calls in `replay` makes
   two of those tests fail; we tried it.
+- No skew between the two paths: 300 transactions sent through the service's request path, with a `+01:00` offset,
+  get exactly the scores the offline feature matrix gives
+  (`test_the_service_scores_a_transaction_exactly_as_training_does`). Converting the timestamp to UTC instead of
+  keeping the wall clock makes it fail.
+- This holds for transactions that arrive in time order. A late one is scored against a history that already holds
+  later activity (ADR 0007).
 - A Python loop is slower than a vectorised pipeline: 723,121 transactions take about 15 s on the laptop named in the
   README. Fine at this size, not at a billion rows.
 - The first 14 days are a warm-up that only builds history. Training on them would teach the model a cold start

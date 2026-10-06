@@ -161,15 +161,16 @@ More: the [model card](docs/model-card.md) with metrics by segment, the [data an
 ```sh
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src tests                 # strict
-uv run pytest                         # 41 tests, offline, warnings are errors, about 20 s warm
+uv run pytest                         # 42 tests, offline, warnings are errors, about 20 s warm
 uv run python tools/license_audit.py  # every installed distribution, permissive or the build fails
 ```
 
 What the tests pin down: generator determinism; point-in-time correctness (future rows deleted, rewritten, input
-shuffled); the threshold search against a hand-worked example and against brute force; PSI against a hand-worked
-value; the API contract (422 on ten kinds of bad input, the response shape, idempotent retries); reason codes
-consistent with SHAP signs and SHAP values summing to the model output; and a tiny end-to-end run that trains,
-registers, refuses to promote an equal model, exports, serves and raises a drift alert.
+shuffled); the service scoring a transaction exactly as the offline feature matrix does; the threshold search
+against a hand-worked example and against brute force; PSI against a hand-worked value; the API contract (422 on ten
+kinds of bad input, the response shape, idempotent retries); reason codes consistent with SHAP signs and SHAP values
+summing to the model output; and a tiny end-to-end run that trains, registers, refuses to promote an equal model,
+exports, loads the export into the service and raises a drift alert.
 
 CI also exports the locked requirements and runs `pip-audit` on them, and builds the Docker image, starts it against
 the exported model and scores a request.
