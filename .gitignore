@@ -1,0 +1,24 @@
+# Python and tooling
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+.claude/
+
+# Secrets never belong in the repository
+.env
+.env.*
+
+# Everything the commands produce: data, MLflow tracking and artifacts, exported models
+data/
+mlflow.db
+mlruns/
+mlartifacts/
+models/
+sweep/
+requirements.txt

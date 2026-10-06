@@ -1,0 +1,89 @@
+[project]
+name = "fraud-detection-mlops"
+version = "0.1.0"
+description = "Card-transaction fraud detection with point-in-time features, cost-based thresholds, reason codes, a model registry and drift monitoring"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Tunahan Ali Ozturk" }]
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.20.0",
+    "fastapi>=0.142.2",
+    "lightgbm>=4.7.0",
+    "mlflow-skinny>=3.16.1",
+    "numpy>=2.5.3",
+    "pandas>=3.0.6",
+    "pyarrow>=25.0.1",
+    "pydantic>=2.13.5",
+    "scikit-learn>=1.9.1",
+    "shap>=0.52.0",
+    "sqlalchemy>=2.0.54,<2.1",  # MLflow 3.16 mappers use `noload`, deprecated in 2.1: see ADR 0001
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+fraud = "fraud_detection.cli:main"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=2.4.0",
+    "pandas-stubs>=3.0.5.260914",
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fraud_detection"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+src = ["src", "tests", "load", "tools"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "RET", "PTH", "ARG", "PL", "RUF", "S", "DTZ", "NPY", "PD"]
+ignore = [
+    "PLR0913",  # training and reporting functions take their inputs explicitly rather than in a bag
+    "PLR0917",  # same reason, for positional arguments
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["fraud_detection", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004", "S311"]
+"load/**" = ["T20", "PLR2004", "S311"]
+"tools/**" = ["T20", "PLR2004"]
+"src/fraud_detection/cli.py" = ["T20"]  # a command line tool prints
+"src/fraud_detection/generate.py" = ["PLR2004"]  # the generator's probabilities are its specification
+
+[tool.mypy]
+strict = true
+python_version = "3.14"
+mypy_path = "src"
+packages = ["fraud_detection"]
+plugins = ["pydantic.mypy"]
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["sklearn.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = ["--strict-markers", "-ra"]
+xfail_strict = true
+filterwarnings = [
+    "error",
+    # Raised by MLflow at import time, about its own chat-agent schema; nothing in this project can change it.
+    "ignore:.*Any type hint is inferred as AnyType:UserWarning",
+    # MLflow 3.16 still writes files with codecs.open, which Python 3.14 deprecates. Scoped to MLflow's own modules.
+    'ignore:codecs.open\(\) is deprecated:DeprecationWarning:mlflow\..*',
+]
