@@ -27,7 +27,9 @@ purchases are unusually large, and some spending happens at night.
   complete and instant. A PR-AUC of 0.911 here says the pipeline works, not that a bank would see 0.911.
 - 20% of customers suffer one incident in four months, far above reality, so that the test window holds enough fraud
   (665 transactions) to measure anything. The transaction-level fraud rate is still realistic at 0.49%.
-- Any country effect the model learns is an artefact: the fraud patterns pick foreign countries uniformly.
+- Fraud rates by merchant country differ in the data (0.9% to 5.4% of foreign purchases) only because fraud abroad
+  picks a foreign merchant at random while genuine trips pick a country. No feature carries a country code, so the
+  model sees home versus abroad and cannot learn a country ranking.
 
 ## Alternatives
 

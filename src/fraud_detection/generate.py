@@ -30,8 +30,9 @@ CARD_TESTING_CATEGORIES = ["digital_goods"]
 HIGH_VALUE_CATEGORIES = ["electronics", "jewellery", "travel"]
 ONLINE_CATEGORIES = ["online_retail", "electronics", "digital_goods"]
 
-# Country codes only label "home" versus "abroad". The fraud patterns pick foreign countries uniformly, so no real
-# country is made to look riskier than another.
+# Country codes only label "home" versus "abroad": no feature carries the code itself. Fraud abroad picks a foreign
+# merchant at random, so fraud rates by country (0.9% to 5.4% of foreign purchases) follow merchant counts and trips,
+# not anything about the country.
 HOME_COUNTRIES = ["NL", "BE", "DE"]
 HOME_WEIGHTS = [0.8, 0.1, 0.1]
 COUNTRIES = ["NL", "BE", "DE", "FR", "ES", "IT", "PL", "GB", "US", "TR"]
