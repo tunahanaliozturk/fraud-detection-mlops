@@ -1,0 +1,80 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: lint, format, types, licences
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.2.0
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy src tests
+      - run: uv run python tools/license_audit.py
+
+  tests:
+    name: tests (offline, tiny data)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.2.0
+      - run: uv sync --locked
+      - run: uv run pytest -q
+
+  vulnerabilities:
+    name: known vulnerabilities in the locked dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.2.0
+      - run: uv export --locked --no-dev --no-emit-project --format requirements-txt -o requirements.txt
+      - run: uvx pip-audit --requirement requirements.txt --disable-pip --no-deps --strict
+
+  quickstart:
+    name: README quick start, then the image against the exported model
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.2.0
+      - run: uv sync --locked
+      - name: Generate, train, export, evaluate, drift (the README commands)
+        run: |
+          uv run fraud generate
+          uv run fraud train
+          uv run fraud export
+          uv run fraud evaluate
+          uv run fraud drift
+          uv run fraud drift --scenario shifted
+      - name: The drift scenario must alert, the quiet window must not
+        run: |
+          uv run fraud drift --fail-on-alert
+          if uv run fraud drift --scenario shifted --fail-on-alert; then echo "shifted scenario raised no alert"; exit 1; fi
+      - name: Image starts healthy and scores a transaction
+        run: |
+          docker build --tag fraud-detection-mlops:ci .
+          docker run --detach --name fraud -p 8000:8000 \
+            -v "$PWD/models:/app/models:ro" -v "$PWD/data:/app/data:ro" fraud-detection-mlops:ci
+          for i in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' fraud)" = healthy ] && break
+            sleep 2
+          done
+          curl --fail --silent -X POST localhost:8000/score -H 'Content-Type: application/json' \
+            -d '{"transaction_id":"ci-1","timestamp":"2026-05-02T03:12:00+02:00","customer_id":"c00042","customer_country":"NL","merchant_id":"m01234","merchant_country":"US","amount":1890.0,"device_id":"unknown-phone"}' \
+            | tee response.json
+          grep -q '"decision":"decline"' response.json
+          uv run python load/latency.py --requests 1000 --warmup 100
+      - if: failure()
+        run: docker logs fraud || true
