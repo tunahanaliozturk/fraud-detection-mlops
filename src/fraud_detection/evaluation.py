@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from fraud_detection.explain import Explainer, global_importance
-from fraud_detection.metrics import cost_at, pr_auc, recall_at_precision, reliability
+from fraud_detection.metrics import cost_at, cost_minimising_threshold, pr_auc, recall_at_precision, reliability
 from fraud_detection.training import DecisionPolicy, Split, labels, matrix
 
 CURVE_THRESHOLDS = [0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.25, 0.5]
@@ -75,7 +75,15 @@ def cost_curve(y: np.ndarray, score: np.ndarray, amount: np.ndarray, policy: Dec
             ]
         )
     header = ["threshold", "flagged", "fraud caught", "fraud missed", "missed EUR", "false alarms", "total cost EUR"]
-    return _table(header, rows)
+    # The best threshold on this window, found with hindsight. Shown only to price the validation choice.
+    hindsight = cost_minimising_threshold(y, score, amount, policy.cost_model)
+    best = cost_at(y, score, amount, hindsight, policy.cost_model).total
+    chosen = cost_at(y, score, amount, policy.review_threshold, policy.cost_model).total
+    return _table(header, rows) + (
+        "\n\n"
+        f"With hindsight, the cheapest threshold on this window is {hindsight:.4f} at EUR {_eur(best)}. "
+        f"The threshold chosen on validation costs {chosen / best - 1:.1%} more."
+    )
 
 
 def bands(test: pd.DataFrame, score: np.ndarray, policy: DecisionPolicy) -> str:
