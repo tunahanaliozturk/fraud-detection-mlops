@@ -1,0 +1,81 @@
+# Requests against `uv run fraud serve` (127.0.0.1:8000), in the order you would try them.
+# Customer c00042 exists in the generated history: NL card, spends around EUR 30 on a known phone.
+
+### Health: which model version is serving
+GET http://127.0.0.1:8000/health
+
+### An ordinary purchase: known device, home country, afternoon. Expect approve.
+POST http://127.0.0.1:8000/score
+Content-Type: application/json
+
+{
+  "transaction_id": "demo-1",
+  "timestamp": "2026-05-02T14:00:00+02:00",
+  "customer_id": "c00042",
+  "customer_country": "NL",
+  "merchant_id": "m00010",
+  "merchant_country": "NL",
+  "amount": 35.5,
+  "device_id": "c00042-d0"
+}
+
+### Three in the morning, abroad, unknown device, EUR 1,890. Expect decline with reasons.
+POST http://127.0.0.1:8000/score
+Content-Type: application/json
+
+{
+  "transaction_id": "demo-2",
+  "timestamp": "2026-05-02T03:12:00+02:00",
+  "customer_id": "c00042",
+  "customer_country": "NL",
+  "merchant_id": "m01234",
+  "merchant_country": "US",
+  "amount": 1890.0,
+  "device_id": "unknown-phone"
+}
+
+### The same transaction id again: the identical response, and it is not counted twice.
+POST http://127.0.0.1:8000/score
+Content-Type: application/json
+
+{
+  "transaction_id": "demo-2",
+  "timestamp": "2026-05-02T03:12:00+02:00",
+  "customer_id": "c00042",
+  "customer_country": "NL",
+  "merchant_id": "m01234",
+  "merchant_country": "US",
+  "amount": 1890.0,
+  "device_id": "unknown-phone"
+}
+
+### No timezone offset: refused with 422, because the local hour would be a guess.
+POST http://127.0.0.1:8000/score
+Content-Type: application/json
+
+{
+  "transaction_id": "demo-3",
+  "timestamp": "2026-05-02T14:00:00",
+  "customer_id": "c00042",
+  "customer_country": "NL",
+  "merchant_id": "m00010",
+  "merchant_country": "NL",
+  "amount": 35.5,
+  "device_id": "c00042-d0"
+}
+
+### A field the schema does not know (here, the label): refused with 422.
+POST http://127.0.0.1:8000/score
+Content-Type: application/json
+
+{
+  "transaction_id": "demo-4",
+  "timestamp": "2026-05-02T14:00:00+02:00",
+  "customer_id": "c00042",
+  "customer_country": "NL",
+  "merchant_id": "m00010",
+  "merchant_country": "NL",
+  "amount": 35.5,
+  "device_id": "c00042-d0",
+  "is_fraud": 0
+}
